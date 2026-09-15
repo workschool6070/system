@@ -13,16 +13,19 @@ import { FlashcardsStudy } from './components/FlashcardsStudy';
 import { PrintableWorksheet } from './components/PrintableWorksheet';
 import { StudentReport } from './components/StudentReport';
 import { ProfileModal } from './components/ProfileModal';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { 
   GraduationCap, 
   BookOpen, 
   CheckCircle, 
   Sparkles, 
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Heart
 } from 'lucide-react';
 
-export default function App() {
+function AppContent() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'worksheets' | 'exam' | 'flashcards' | 'print' | 'report'>('worksheets');
   const [currentModuleId, setCurrentModuleId] = useState<string>(CURRICULUM_MODULES[0].id);
 
@@ -36,9 +39,9 @@ export default function App() {
       }
     }
     return {
-      name: 'عبد الله السعيد',
-      schoolName: 'ثانوية الملك فهد النموذجية',
-      gradeClass: 'الأول الثانوي / 2',
+      name: 'سارة عبد الله',
+      schoolName: 'ثانوية اليرموك للبنات',
+      gradeClass: 'الأول الثانوي / 1',
       academicNumber: '4450891'
     };
   });
@@ -121,7 +124,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900" dir="rtl">
+    <div className={`min-h-screen ${theme.bgPage} flex flex-col font-sans selection:bg-pink-200 selection:text-pink-900 transition-colors duration-300`} dir="rtl">
       
       {/* App Header & Navigation */}
       <Header
@@ -178,16 +181,20 @@ export default function App() {
       </main>
 
       {/* Footer (Hidden on Print) */}
-      <footer className="no-print bg-white border-t border-slate-200 mt-12 py-6 text-xs text-slate-500">
+      <footer className="no-print bg-white/80 backdrop-blur-xs border-t border-pink-100 mt-12 py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-indigo-600" />
+            <div className={`w-5 h-5 rounded-full ${theme.primary} text-white flex items-center justify-center text-[10px]`}>
+              ✨
+            </div>
             <span className="font-bold text-slate-700">
-              منصة أوراق عمل نظم التشغيل وهيكلة HTML للمرحلة الثانوية
+              منصة أوراق عمل مهام نظام التشغيل التفاعلية للمرحلة الثانوية
             </span>
           </div>
-          <div>
-            مصممة ومطابقة لمعايير مناهج الحاسب والتقنية الرقمية • العام الدراسي 1447هـ
+          <div className="flex items-center gap-1 text-slate-500">
+            <span>مصممة ومطابقة لمعايير مناهج الحاسب والتقنية الرقمية</span>
+            <span className="text-rose-400">❤</span>
+            <span>العام الدراسي 1447هـ</span>
           </div>
         </div>
       </footer>
@@ -200,5 +207,13 @@ export default function App() {
         onSave={setStudent}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

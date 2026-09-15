@@ -291,7 +291,7 @@ export const PrintableWorksheet: React.FC<PrintableWorksheetProps> = ({ student 
 
         {/* Footer Signature Box */}
         <div className="pt-6 border-t-2 border-black flex items-center justify-between text-xs font-bold">
-          <div>توقيع معلم المادة: .......................................</div>
+          <div>معلمة المادة: أ. أنهار الأحمدي .......................................</div>
           <div>ختم وتوقيع إدارة المدرسة: .......................................</div>
         </div>
       </div>
