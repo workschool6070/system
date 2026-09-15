@@ -11,12 +11,6 @@ export default function App() {
   const [currentModuleIndex, setCurrentModuleIndex] = useState<number>(0);
 
   const [student, setStudent] = useState<StudentProfile>(() => {
-    const saved = localStorage.getItem('os_html_student_profile');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
     return {
       name: '',
       schoolName: 'المرحلة الثانوية',
@@ -25,54 +19,8 @@ export default function App() {
     };
   });
 
-  const [answers, setAnswers] = useState<{ [questionId: string]: any }>(() => {
-    const saved = localStorage.getItem('os_html_student_answers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Record<string, any>;
-        const validQuestionMap = new Map(CURRICULUM_MODULES.flatMap(m => m.questions.map(q => [q.id, q])));
-        const sanitized: { [key: string]: any } = {};
-        for (const [key, val] of Object.entries(parsed)) {
-          const matchedQ = validQuestionMap.get(key);
-          if (matchedQ && typeof val === 'object' && val !== null) {
-            sanitized[key] = {
-              ...val,
-              pointsEarned: (val as any).isCorrect ? matchedQ.points : 0
-            };
-          }
-        }
-        return sanitized;
-      } catch (e) {}
-    }
-    return {};
-  });
-
-  const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(() => {
-    const saved = localStorage.getItem('os_html_assessment_result');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return null;
-  });
-
-  // Persistence
-  useEffect(() => {
-    if (student.name) {
-      localStorage.setItem('os_html_student_profile', JSON.stringify(student));
-    }
-  }, [student]);
-
-  useEffect(() => {
-    localStorage.setItem('os_html_student_answers', JSON.stringify(answers));
-  }, [answers]);
-
-  useEffect(() => {
-    if (assessmentResult) {
-      localStorage.setItem('os_html_assessment_result', JSON.stringify(assessmentResult));
-    }
-  }, [assessmentResult]);
+  const [answers, setAnswers] = useState<{ [questionId: string]: any }>({});
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null);
 
   // Calculations
   const allQuestions = CURRICULUM_MODULES.flatMap(m => m.questions);
@@ -94,6 +42,12 @@ export default function App() {
 
   const handleStartWorksheet = (updatedStudent: StudentProfile) => {
     setStudent(updatedStudent);
+    // Always start with a 100% clean worksheet with no prior answers for every student
+    setAnswers({});
+    setAssessmentResult(null);
+    localStorage.removeItem('os_html_student_answers');
+    localStorage.removeItem('os_html_assessment_result');
+    localStorage.setItem('os_html_student_profile', JSON.stringify(updatedStudent));
     setCurrentStep('tasks');
     setCurrentModuleIndex(0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -164,6 +118,7 @@ export default function App() {
           setCurrentStep('tasks');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+        onResetStudent={handleResetForNewStudent}
       />
 
       {/* Main Content Area */}

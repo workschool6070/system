@@ -23,6 +23,7 @@ interface HeaderProps {
   onGoToLogin: () => void;
   onGoToReport: () => void;
   onSelectModuleIndex: (index: number) => void;
+  onResetStudent?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,7 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   totalQuestionsCount,
   onGoToLogin,
   onGoToReport,
-  onSelectModuleIndex
+  onSelectModuleIndex,
+  onResetStudent
 }) => {
   const progressPercent = Math.min(100, Math.round((completedQuestionsCount / Math.max(1, totalQuestionsCount)) * 100));
 
@@ -74,6 +76,17 @@ export const Header: React.FC<HeaderProps> = ({
                 معلمة المادة: <strong className="text-rose-700">أنهار الأحمدي</strong>
               </div>
             </div>
+
+            {onResetStudent && (
+              <button
+                onClick={onResetStudent}
+                title="تسجيل طالبة جديدة ومسح الإجابات للبدء من جديد"
+                className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 text-[11px] font-bold border border-slate-200 hover:border-rose-300 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>طالبة جديدة</span>
+              </button>
+            )}
           </div>
 
           {/* Left: Points & Navigation shortcut */}
