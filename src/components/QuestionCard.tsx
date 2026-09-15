@@ -221,7 +221,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-            {question.points} درجات
+            {question.points} {question.points === 1 ? 'درجة' : 'درجة'}
           </span>
           {isSubmitted && (
             <button

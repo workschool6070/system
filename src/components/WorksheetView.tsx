@@ -5,38 +5,38 @@ import {
   ChevronLeft, 
   ChevronRight, 
   BookOpen, 
-  HelpCircle, 
   Award, 
-  FileText,
-  Clock,
+  Check,
   RotateCcw,
-  Check
+  Info,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
+  Layers
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WorksheetModule } from '../types';
 import { QuestionCard } from './QuestionCard';
-import { useTheme } from '../context/ThemeContext';
 
 interface WorksheetViewProps {
   modules: WorksheetModule[];
-  currentModuleId: string;
-  onSelectModule: (moduleId: string) => void;
+  currentModuleIndex: number;
+  onSelectModuleIndex: (index: number) => void;
   answers: { [questionId: string]: any };
   onAnswerQuestion: (questionId: string, answer: any, isCorrect: boolean, pointsEarned: number) => void;
-  onNavigateToExam: () => void;
+  onGoToReport: () => void;
 }
 
 export const WorksheetView: React.FC<WorksheetViewProps> = ({
   modules,
-  currentModuleId,
-  onSelectModule,
+  currentModuleIndex,
+  onSelectModuleIndex,
   answers,
   onAnswerQuestion,
-  onNavigateToExam
+  onGoToReport
 }) => {
-  const { theme } = useTheme();
-  const currentModule = modules.find(m => m.id === currentModuleId) || modules[0];
-  const currentModuleIndex = modules.findIndex(m => m.id === currentModule.id);
+  const [showExplanation, setShowExplanation] = useState<boolean>(true);
+  const currentModule = modules[currentModuleIndex] || modules[0];
 
   // Calculate module stats
   const totalQuestions = currentModule.questions.length;
@@ -44,167 +44,197 @@ export const WorksheetView: React.FC<WorksheetViewProps> = ({
   const correctCount = currentModule.questions.filter(q => answers[q.id]?.isCorrect).length;
   const totalModulePoints = currentModule.questions.reduce((acc, q) => acc + q.points, 0);
   const earnedModulePoints = currentModule.questions.reduce((acc, q) => {
-    return acc + (answers[q.id]?.pointsEarned || 0);
+    return acc + (answers[q.id]?.isCorrect ? q.points : 0);
+  }, 0);
+
+  // Global points
+  const allQuestions = modules.flatMap(m => m.questions);
+  const totalGlobalPoints = allQuestions.reduce((a, b) => a + b.points, 0);
+  const earnedGlobalPoints = modules.reduce((modAcc, mod) => {
+    return modAcc + mod.questions.reduce((qAcc, q) => {
+      return qAcc + (answers[q.id]?.isCorrect ? q.points : 0);
+    }, 0);
   }, 0);
 
   const isModuleCompleted = answeredCount === totalQuestions;
+  const isLastModule = currentModuleIndex === modules.length - 1;
 
-  const handleNextModule = () => {
-    if (currentModuleIndex < modules.length - 1) {
-      onSelectModule(modules[currentModuleIndex + 1].id);
+  const handleNext = () => {
+    if (!isLastModule) {
+      onSelectModuleIndex(currentModuleIndex + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      onGoToReport();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const handlePrevModule = () => {
+  const handlePrev = () => {
     if (currentModuleIndex > 0) {
-      onSelectModule(modules[currentModuleIndex - 1].id);
+      onSelectModuleIndex(currentModuleIndex - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const triggerCelebration = () => {
     confetti({
-      particleCount: 90,
-      spread: 75,
+      particleCount: 80,
+      spread: 70,
       origin: { y: 0.6 }
     });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto pb-12">
       
-      {/* Module Selector Pills */}
-      <div className="bg-white/90 backdrop-blur-xs p-3 rounded-2xl border border-pink-100 shadow-xs">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+      {/* Roadmap & Global Score Bar */}
+      <div className="bg-white rounded-2xl border border-rose-100 p-3 sm:p-4 shadow-xs space-y-2">
+        <div className="flex items-center justify-between text-xs font-bold">
+          <div className="flex items-center gap-1.5 text-slate-800">
+            <Layers className="w-4 h-4 text-rose-500" />
+            <span>تسلسل المهام الأربعة:</span>
+          </div>
+          <div className="text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+            مجموع نقاطك الكلية: <strong className="text-rose-600 text-sm font-black">{earnedGlobalPoints}</strong> من <strong>{totalGlobalPoints}</strong>
+          </div>
+        </div>
+
+        {/* 4 Steps Chips with Points */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 pt-1">
           {modules.map((mod, idx) => {
             const modAnswered = mod.questions.filter(q => answers[q.id]?.submitted).length;
-            const isDone = modAnswered === mod.questions.length && mod.questions.length > 0;
-            const isActive = mod.id === currentModule.id;
+            const modIsDone = modAnswered === mod.questions.length && mod.questions.length > 0;
+            const modEarned = mod.questions.reduce((acc, q) => acc + (answers[q.id]?.isCorrect ? q.points : 0), 0);
+            const modTotal = mod.questions.reduce((acc, q) => acc + q.points, 0);
+            const isCurrent = idx === currentModuleIndex;
 
             return (
               <button
                 key={mod.id}
-                onClick={() => onSelectModule(mod.id)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-                  isActive
-                    ? `${theme.navActive}`
-                    : 'bg-white hover:bg-pink-50/50 text-slate-700 border border-slate-200/70 hover:border-pink-200'
+                onClick={() => onSelectModuleIndex(idx)}
+                className={`p-2 rounded-xl text-center transition-all border ${
+                  isCurrent
+                    ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                    : modIsDone
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-bold ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-800'
+                <div className="text-[11px] font-black leading-tight truncate">
+                  المهمة {idx + 1}
+                </div>
+                <div className={`text-[10px] font-bold mt-0.5 ${
+                  isCurrent ? 'text-rose-100' : modIsDone ? 'text-emerald-700' : 'text-slate-500'
                 }`}>
-                  {idx + 1}
-                </span>
-                <span>{mod.shortTitle}</span>
-                {isDone && <CheckCircle2 className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-500'}`} />}
+                  {modEarned} / {modTotal} درجة
+                </div>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Current Module Overview Card */}
-      <div className="bg-white rounded-3xl border border-pink-100/80 p-6 sm:p-8 shadow-xs relative overflow-hidden">
-        {/* Subtle Background Accent */}
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400" />
+      {/* Current Task Header Card */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-rose-100 p-4 sm:p-6 shadow-xs relative overflow-hidden space-y-3">
+        
+        {/* Header Badges */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+            <span>المهمة ({currentModuleIndex + 1} من {modules.length}): {currentModule.shortTitle}</span>
+          </span>
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-3xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${theme.badgeBg} ${theme.badgeText} border ${theme.primaryBorder} flex items-center gap-1`}>
-                <Sparkles className="w-3 h-3" />
-                <span>ورقة العمل #{currentModuleIndex + 1}</span>
-              </span>
-              <span className="text-xs text-slate-400 font-medium">
-                {totalQuestions} أسئلة تفاعلية • {totalModulePoints} نقطة
-              </span>
+          <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
+            درجات هذه المهمة: <strong className="text-rose-600 font-black">{earnedModulePoints}</strong> من <strong>{totalModulePoints}</strong> درجات
+          </span>
+        </div>
+
+        {/* Task Title */}
+        <h2 className="text-lg sm:text-2xl font-black text-slate-900 leading-snug">
+          {currentModule.title}
+        </h2>
+
+        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          {currentModule.description}
+        </p>
+
+        {/* =============================================================== */}
+        {/* 📖 Concept Lesson Card for this Specific Task (شرح مفهوم المهمة) */}
+        {/* =============================================================== */}
+        {currentModule.lessonExplanation && (
+          <div className="mt-3 bg-gradient-to-br from-rose-50/70 via-pink-50/40 to-amber-50/40 border border-rose-200/80 rounded-2xl p-4 sm:p-5 space-y-3 text-right">
+            <div className="flex items-center justify-between pb-2 border-b border-rose-200/60">
+              <div className="flex items-center gap-2 text-rose-900 font-black text-xs sm:text-sm">
+                <Lightbulb className="w-4 h-4 text-amber-500 fill-amber-400" />
+                <span>{currentModule.lessonExplanation.conceptTitle}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExplanation(!showExplanation)}
+                className="text-[11px] font-bold text-rose-700 hover:text-rose-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-rose-200"
+              >
+                <span>{showExplanation ? 'إخفاء الشرح' : 'قراءة الشرح'}</span>
+                {showExplanation ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
             </div>
 
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 leading-snug">
-              {currentModule.title}
-            </h2>
+            {showExplanation && (
+              <div className="space-y-3 text-xs sm:text-sm animate-fade-in">
+                <p className="text-slate-700 leading-relaxed font-medium">
+                  {currentModule.lessonExplanation.overview}
+                </p>
 
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              {currentModule.description}
-            </p>
-
-            {/* Learning Objectives Chips */}
-            {currentModule.learningObjectives && currentModule.learningObjectives.length > 0 && (
-              <div className="pt-2">
-                <span className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-pink-500" />
-                  <span>الأهداف التعليمية المكتسبة:</span>
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {currentModule.learningObjectives.map((obj, i) => (
-                    <div key={i} className="text-[11px] sm:text-xs bg-rose-50/70 border border-rose-100 text-rose-800 px-2.5 py-1 rounded-lg">
-                      🌸 {obj}
+                {/* Key Bullet Points */}
+                <div className="space-y-1.5 bg-white/80 p-3 rounded-xl border border-rose-100">
+                  <span className="font-black text-slate-800 text-xs block mb-1">أبرز المفاهيم المستفادة:</span>
+                  {currentModule.lessonExplanation.keyPoints.map((pt, pIdx) => (
+                    <div key={pIdx} className="flex items-start gap-2 text-slate-700 text-xs leading-relaxed">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                      <span>{pt}</span>
                     </div>
                   ))}
+                </div>
+
+                {/* Real world example */}
+                <div className="p-2.5 bg-amber-100/60 border border-amber-200 rounded-xl text-[11px] sm:text-xs text-amber-950">
+                  <strong>🌸 مثال واقعي للتبسيط:</strong> {currentModule.lessonExplanation.realWorldExample}
+                </div>
+
+                {/* Golden rule */}
+                <div className="text-[11px] sm:text-xs font-black text-rose-900 bg-rose-100/70 p-2 rounded-xl text-center">
+                  ✨ {currentModule.lessonExplanation.goldenRule}
                 </div>
               </div>
             )}
           </div>
+        )}
 
-          {/* Module Progress Box */}
-          <div className="bg-gradient-to-br from-rose-50/50 via-pink-50/40 to-purple-50/40 border border-rose-100 rounded-2xl p-5 shrink-0 flex flex-col items-center justify-center text-center min-w-[210px] space-y-3">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-pink-100"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-rose-500 transition-all duration-700 ease-out"
-                  strokeDasharray={`${(answeredCount / Math.max(1, totalQuestions)) * 100}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="absolute text-xs font-black text-rose-900">
-                {Math.round((answeredCount / Math.max(1, totalQuestions)) * 100)}%
-              </span>
+        {/* Celebration Banner when completed */}
+        {isModuleCompleted && (
+          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>أحسنتِ! تم حل أسئلة هذه المهمة وكسب ({earnedModulePoints} من {totalModulePoints}) درجات 🌸</span>
             </div>
-
-            <div>
-              <span className="text-xs font-bold text-slate-800 block">
-                {answeredCount} من {totalQuestions} تم حلها
-              </span>
-              <span className="text-[11px] text-rose-700 font-semibold mt-0.5 block">
-                {earnedModulePoints} من {totalModulePoints} نقطة
-              </span>
-            </div>
-
-            {isModuleCompleted && (
-              <button
-                onClick={triggerCelebration}
-                className="text-[11px] font-bold text-white bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 px-3 py-1 rounded-full shadow-xs transition-transform active:scale-95 flex items-center gap-1"
-              >
-                <Sparkles className="w-3 h-3 text-amber-200" />
-                <span>أحسنتِ يا بطلة! 🎉</span>
-              </button>
-            )}
+            <button
+              onClick={triggerCelebration}
+              className="text-[11px] font-bold bg-emerald-600 text-white px-3 py-1 rounded-xl shrink-0 active:scale-95"
+            >
+              احتفال 🎉
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Questions Section */}
+      {/* Interactive Questions List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2 text-slate-800 font-black text-base">
-            <BookOpen className="w-5 h-5 text-rose-500" />
-            <span>الأنشطة والأسئلة التفاعلية:</span>
+          <div className="flex items-center gap-2 text-slate-900 font-black text-sm sm:text-base">
+            <BookOpen className="w-4 h-4 text-rose-500" />
+            <span>الأسئلة التفاعلية لهذه المهمة ({totalQuestions} أسئلة • {totalModulePoints} درجات):</span>
           </div>
-          <span className="text-xs text-slate-500">
-            أجيبي على الأسئلة للحصول على التغذية الراجعة والنقاط
+          <span className="text-[11px] text-slate-500 font-bold">
+            كل سؤال = 2.5 درجة
           </span>
         </div>
 
@@ -219,39 +249,43 @@ export const WorksheetView: React.FC<WorksheetViewProps> = ({
         ))}
       </div>
 
-      {/* Navigation Footer between Modules */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-pink-100 flex items-center justify-between gap-3 shadow-xs">
+      {/* Linear Sequential Navigation Bar (Mobile First Bottom Bar) */}
+      <div className="bg-white p-4 rounded-2xl sm:rounded-3xl border border-rose-100 shadow-md flex items-center justify-between gap-3 sticky bottom-3 z-30">
+        
+        {/* Previous Button */}
         <button
-          onClick={handlePrevModule}
+          onClick={handlePrev}
           disabled={currentModuleIndex === 0}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex-1 sm:flex-initial py-3 px-4 sm:px-6 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all min-h-[46px] ${
             currentModuleIndex === 0
-              ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400'
-              : 'bg-white border border-pink-200 hover:bg-pink-50 text-slate-700'
+              ? 'opacity-30 cursor-not-allowed bg-slate-100 text-slate-400'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95'
           }`}
         >
           <ChevronRight className="w-4 h-4" />
-          <span>الورقة السابقة</span>
+          <span>المهمة السابقة</span>
         </button>
 
-        {currentModuleIndex < modules.length - 1 ? (
+        {/* Next or Finish Button */}
+        {!isLastModule ? (
           <button
-            onClick={handleNextModule}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-md shadow-rose-200 transition-all"
+            onClick={handleNext}
+            className="flex-1 sm:flex-initial py-3 px-5 sm:px-8 rounded-2xl text-xs sm:text-sm font-black bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-md shadow-pink-200 flex items-center justify-center gap-2 transition-all active:scale-95 min-h-[46px]"
           >
-            <span>الانتقال للورقة التالية</span>
+            <span>الانتقال للمهمة التالية ({currentModuleIndex + 2} من 4)</span>
             <ChevronLeft className="w-4 h-4" />
           </button>
         ) : (
           <button
-            onClick={onNavigateToExam}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white shadow-md shadow-amber-200 transition-all"
+            onClick={handleNext}
+            className="flex-1 sm:flex-initial py-3 px-5 sm:px-8 rounded-2xl text-xs sm:text-sm font-black bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 text-white shadow-lg shadow-rose-200 flex items-center justify-center gap-2 transition-all active:scale-95 min-h-[46px] animate-pulse"
           >
             <Award className="w-4 h-4 text-amber-200" />
-            <span>الانتقال للاختبار الشامل النهائي</span>
+            <span>عرض تقرير الأداء النهائي وشهادة التميز 🌟</span>
             <ChevronLeft className="w-4 h-4" />
           </button>
         )}
+
       </div>
 
     </div>

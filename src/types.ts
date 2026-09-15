@@ -71,6 +71,13 @@ export interface WorksheetModule {
   iconName: string;
   category: CategoryType;
   learningObjectives: string[];
+  lessonExplanation?: {
+    conceptTitle: string;
+    overview: string;
+    keyPoints: string[];
+    realWorldExample: string;
+    goldenRule: string;
+  };
   questions: Question[];
   summaryNotes?: string[];
 }

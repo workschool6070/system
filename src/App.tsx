@@ -1,48 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CURRICULUM_MODULES 
-} from './data/curriculumData';
-import { 
-  StudentProfile, 
-  AssessmentResult 
-} from './types';
+import { CURRICULUM_MODULES } from './data/curriculumData';
+import { StudentProfile, AssessmentResult } from './types';
 import { Header } from './components/Header';
+import { StudentWelcomeLogin } from './components/StudentWelcomeLogin';
 import { WorksheetView } from './components/WorksheetView';
-import { ComprehensiveExam } from './components/ComprehensiveExam';
-import { FlashcardsStudy } from './components/FlashcardsStudy';
-import { PrintableWorksheet } from './components/PrintableWorksheet';
 import { StudentReport } from './components/StudentReport';
-import { ProfileModal } from './components/ProfileModal';
-import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { 
-  GraduationCap, 
-  BookOpen, 
-  CheckCircle, 
-  Sparkles, 
-  HelpCircle,
-  ExternalLink,
-  Heart
-} from 'lucide-react';
 
-function AppContent() {
-  const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'worksheets' | 'exam' | 'flashcards' | 'print' | 'report'>('worksheets');
-  const [currentModuleId, setCurrentModuleId] = useState<string>(CURRICULUM_MODULES[0].id);
+export default function App() {
+  const [currentStep, setCurrentStep] = useState<'login' | 'tasks' | 'report'>('login');
+  const [currentModuleIndex, setCurrentModuleIndex] = useState<number>(0);
 
   const [student, setStudent] = useState<StudentProfile>(() => {
     const saved = localStorage.getItem('os_html_student_profile');
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     }
     return {
-      name: 'سارة عبد الله',
-      schoolName: 'ثانوية اليرموك للبنات',
+      name: '',
+      schoolName: 'المرحلة الثانوية',
       gradeClass: 'الأول الثانوي / 1',
-      academicNumber: '4450891'
+      academicNumber: ''
     };
   });
 
@@ -50,7 +29,19 @@ function AppContent() {
     const saved = localStorage.getItem('os_html_student_answers');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Record<string, any>;
+        const validQuestionMap = new Map(CURRICULUM_MODULES.flatMap(m => m.questions.map(q => [q.id, q])));
+        const sanitized: { [key: string]: any } = {};
+        for (const [key, val] of Object.entries(parsed)) {
+          const matchedQ = validQuestionMap.get(key);
+          if (matchedQ && typeof val === 'object' && val !== null) {
+            sanitized[key] = {
+              ...val,
+              pointsEarned: (val as any).isCorrect ? matchedQ.points : 0
+            };
+          }
+        }
+        return sanitized;
       } catch (e) {}
     }
     return {};
@@ -66,11 +57,11 @@ function AppContent() {
     return null;
   });
 
-  const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
-
   // Persistence
   useEffect(() => {
-    localStorage.setItem('os_html_student_profile', JSON.stringify(student));
+    if (student.name) {
+      localStorage.setItem('os_html_student_profile', JSON.stringify(student));
+    }
   }, [student]);
 
   useEffect(() => {
@@ -83,23 +74,33 @@ function AppContent() {
     }
   }, [assessmentResult]);
 
-  // Aggregate questions & points calculation
+  // Calculations
   const allQuestions = CURRICULUM_MODULES.flatMap(m => m.questions);
   const totalQuestionsCount = allQuestions.length;
   const maxPoints = allQuestions.reduce((acc, q) => acc + q.points, 0);
 
-  const completedQuestionsCount = Object.keys(answers).filter(qId => answers[qId]?.submitted).length;
-  const totalPoints = Object.keys(answers).reduce((acc, qId) => {
-    return acc + (answers[qId]?.pointsEarned || 0);
+  const completedQuestionsCount = allQuestions.filter(q => answers[q.id]?.submitted).length;
+  const totalPoints = CURRICULUM_MODULES.reduce((modAcc, module) => {
+    const modEarned = module.questions.reduce((qAcc, q) => {
+      const userAns = answers[q.id];
+      return qAcc + (userAns?.isCorrect ? q.points : 0);
+    }, 0);
+    return modAcc + modEarned;
   }, 0);
 
   const completedWorksheetsCount = CURRICULUM_MODULES.filter(m => {
     return m.questions.length > 0 && m.questions.every(q => answers[q.id]?.submitted);
   }).length;
 
-  const handleAnswerQuestion = (questionId: string, answer: any, isCorrect: boolean, pointsEarned: number) => {
+  const handleStartWorksheet = (updatedStudent: StudentProfile) => {
+    setStudent(updatedStudent);
+    setCurrentStep('tasks');
+    setCurrentModuleIndex(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAnswerQuestion = (questionId: string, answer: any, isCorrect: boolean, _pointsEarned: number) => {
     if (answer === null) {
-      // reset
       setAnswers(prev => {
         const next = { ...prev };
         delete next[questionId];
@@ -108,62 +109,91 @@ function AppContent() {
       return;
     }
 
+    const matchedQ = allQuestions.find(q => q.id === questionId);
+    const validPoints = matchedQ ? (isCorrect ? matchedQ.points : 0) : (isCorrect ? 2.5 : 0);
+
     setAnswers(prev => ({
       ...prev,
       [questionId]: {
         answer,
         isCorrect,
-        pointsEarned,
+        pointsEarned: validPoints,
         submitted: true
       }
     }));
   };
 
-  const handleFinishExam = (result: AssessmentResult) => {
-    setAssessmentResult(result);
+  const handleResetForNewStudent = () => {
+    if (window.confirm('هل تودين تسجيل طالبة جديدة والبدء من جديد؟')) {
+      setAnswers({});
+      setAssessmentResult(null);
+      setStudent({
+        name: '',
+        schoolName: 'المرحلة الثانوية',
+        gradeClass: 'الأول الثانوي / 1',
+        academicNumber: ''
+      });
+      localStorage.removeItem('os_html_student_answers');
+      localStorage.removeItem('os_html_assessment_result');
+      setCurrentStep('login');
+      setCurrentModuleIndex(0);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
-    <div className={`min-h-screen ${theme.bgPage} flex flex-col font-sans selection:bg-pink-200 selection:text-pink-900 transition-colors duration-300`} dir="rtl">
+    <div className="min-h-screen bg-[#faf8f6] text-slate-800 flex flex-col font-sans selection:bg-rose-200 selection:text-rose-900" dir="rtl">
       
-      {/* App Header & Navigation */}
+      {/* Dynamic Header */}
       <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        currentStep={currentStep}
+        currentModuleIndex={currentModuleIndex}
+        totalModulesCount={CURRICULUM_MODULES.length}
         student={student}
-        setStudent={setStudent}
         totalPoints={totalPoints}
         maxPoints={maxPoints}
         completedQuestionsCount={completedQuestionsCount}
         totalQuestionsCount={totalQuestionsCount}
-        onOpenProfile={() => setIsProfileOpen(true)}
+        onGoToLogin={() => setCurrentStep('login')}
+        onGoToReport={() => {
+          setCurrentStep('report');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectModuleIndex={(index) => {
+          setCurrentModuleIndex(index);
+          setCurrentStep('tasks');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {activeTab === 'worksheets' && (
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        
+        {/* Step 0: Welcome & Student Login */}
+        {currentStep === 'login' && (
+          <StudentWelcomeLogin
+            student={student}
+            onStart={handleStartWorksheet}
+          />
+        )}
+
+        {/* Step 1 to 4: Sequential Tasks */}
+        {currentStep === 'tasks' && (
           <WorksheetView
             modules={CURRICULUM_MODULES}
-            currentModuleId={currentModuleId}
-            onSelectModule={setCurrentModuleId}
+            currentModuleIndex={currentModuleIndex}
+            onSelectModuleIndex={setCurrentModuleIndex}
             answers={answers}
             onAnswerQuestion={handleAnswerQuestion}
-            onNavigateToExam={() => setActiveTab('exam')}
+            onGoToReport={() => {
+              setCurrentStep('report');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
-        {activeTab === 'exam' && (
-          <ComprehensiveExam
-            onFinishExam={handleFinishExam}
-            onGoToReport={() => setActiveTab('report')}
-          />
-        )}
-
-        {activeTab === 'flashcards' && (
-          <FlashcardsStudy />
-        )}
-
-        {activeTab === 'report' && (
+        {/* Final Step: Performance Report & Certificate */}
+        {currentStep === 'report' && (
           <StudentReport
             student={student}
             assessmentResult={assessmentResult}
@@ -171,49 +201,30 @@ function AppContent() {
             maxPoints={maxPoints}
             completedWorksheetsCount={completedWorksheetsCount}
             totalWorksheetsCount={CURRICULUM_MODULES.length}
-            onTakeExam={() => setActiveTab('exam')}
+            onReviewTasks={() => {
+              setCurrentStep('tasks');
+              setCurrentModuleIndex(0);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNewStudent={handleResetForNewStudent}
           />
         )}
 
-        {activeTab === 'print' && (
-          <PrintableWorksheet student={student} />
-        )}
       </main>
 
-      {/* Footer (Hidden on Print) */}
-      <footer className="no-print bg-white/80 backdrop-blur-xs border-t border-pink-100 mt-12 py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className={`w-5 h-5 rounded-full ${theme.primary} text-white flex items-center justify-center text-[10px]`}>
-              ✨
-            </div>
-            <span className="font-bold text-slate-700">
-              منصة أوراق عمل مهام نظام التشغيل التفاعلية للمرحلة الثانوية
-            </span>
+      {/* Simplified Mobile-Friendly Footer */}
+      <footer className="no-print bg-white/80 border-t border-rose-100 py-4 text-xs text-slate-500">
+        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-right">
+          <div className="flex items-center gap-1.5 font-bold text-slate-700 text-[11px] sm:text-xs">
+            <span>🌸</span>
+            <span>أوراق عمل مهام نظام التشغيل • معلمة المادة: أنهار الأحمدي</span>
           </div>
-          <div className="flex items-center gap-1 text-slate-500">
-            <span>مصممة ومطابقة لمعايير مناهج الحاسب والتقنية الرقمية</span>
-            <span className="text-rose-400">❤</span>
-            <span>العام الدراسي 1447هـ</span>
+          <div className="text-[10px] sm:text-xs text-slate-400">
+            مقرر الحاسب والتقنية الرقمية • المرحلة الثانوية 1447هـ
           </div>
         </div>
       </footer>
 
-      {/* Profile Edit Modal */}
-      <ProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        student={student}
-        onSave={setStudent}
-      />
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
   );
 }
